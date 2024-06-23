@@ -183,7 +183,7 @@ def clear_rectangle(win, ul_y, ul_x, lr_y, lr_x):
 
     win.refresh()
 
-def draw_edit_screen(stdscr, sid, path, subdirs):
+def draw_edit_screen(stdscr, sid, path, subdirs, files):
     height = curses.LINES-10
 
     clear_rectangle(stdscr, 3, 10, curses.LINES-3, curses.COLS-10)
@@ -199,7 +199,11 @@ def draw_edit_screen(stdscr, sid, path, subdirs):
     if len(subdirs) > height+3:
         stdscr.addstr(curses.LINES-4, curses.COLS-10, "v")
 
-    for i, subdir in enumerate(subdirs):
+    i = 0
+    for subdir in subdirs:
+        if i > height+2:
+            break
+    
         color = curses.COLOR_WHITE
         if not os.access(path+"/"+subdir, os.R_OK):
             color = curses.color_pair(2)
@@ -208,37 +212,48 @@ def draw_edit_screen(stdscr, sid, path, subdirs):
             color = curses.A_REVERSE
 
         stdscr.addstr(4+i, 11, subdir, color)
-        if i > height+1:
+
+        i+=1
+
+    for file in files:
+        if i > height+2:
             break
+
+        stdscr.addstr(4+i, 11, file, curses.color_pair(1))
+
+        i+=1
+
     if len(subdirs) == 0:
         stdscr.addstr(4, 11, "(no sub directories)", curses.COLOR_CYAN)
 
 def edit_path(stdscr, path):
 
     subdirs = []
+    files = []
 
     def _load_subdirs():
         subdirs = []
+        files = []
         for entry in os.scandir(path):
+            #log(str(entry))
             if entry.is_dir():
                 subdirs.append(entry.name)
+            else: 
+                files.append(entry.name)
         subdirs.sort()
-        return subdirs
+        return subdirs, files
     
-    subdirs = _load_subdirs()
+    subdirs, files = _load_subdirs()
 
     sid = 0
  
     while True:
-        draw_edit_screen(stdscr, sid, path, subdirs)
+        draw_edit_screen(stdscr, sid, path, subdirs, files)
         ch = stdscr.getch()
         #log(ch)
         if ch == 27:
             break
         if ch == ord("\n"):
-            # if subdirs[sid] == ".":
-            #     return path
-            # else:
             if len(subdirs) == 0:
                 return path
             if path != "/":
@@ -260,7 +275,7 @@ def edit_path(stdscr, path):
                 continue
             base = os.path.basename(path)
             path = os.path.dirname(path)
-            subdirs = _load_subdirs()
+            subdirs, files = _load_subdirs()
             sid = subdirs.index(base)
 
         if ch == ord("l"):
@@ -272,7 +287,7 @@ def edit_path(stdscr, path):
                 path = path+"/"+subdirs[sid]
             else:
                 path = "/"+subdirs[sid]  # root directory
-            subdirs = _load_subdirs()
+            subdirs, files = _load_subdirs()
             sid = 0
 
     return None
@@ -286,6 +301,8 @@ def main(stdscr):
     # Create a color pair (pair number, foreground color, background color)
     curses.init_pair(1, curses.COLOR_BLUE, curses.COLOR_BLACK)
     curses.init_pair(2, curses.COLOR_RED, curses.COLOR_BLACK)
+    curses.init_pair(3, curses.COLOR_CYAN, curses.COLOR_BLACK)
+
 
     # application states
     tab="recent"
@@ -353,7 +370,7 @@ def main(stdscr):
         if ch == ord('d'):
             if tab == "recent":
                 del recents[sid]
-            if tab == "tops":
+            if tab == "top":
                 del tops[sid]
 
         if ch == ord("j"):
